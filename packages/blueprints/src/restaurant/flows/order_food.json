@@ -1,0 +1,38 @@
+{
+  "id": "order_food",
+  "description": "Browse categories and items. Cart and checkout arrive in Phase 1.",
+  "entry": "load_categories",
+  "nodes": [
+    { "id": "load_categories", "type": "action", "action": "catalog.categories", "saveAs": "categories", "next": "pick_category", "onError": "catalog_error" },
+    {
+      "id": "pick_category",
+      "type": "question",
+      "var": "category",
+      "prompt": { "en": "What would you like to order?", "ar": "ماذا تود أن تطلب؟" },
+      "input": { "kind": "list", "button": { "en": "View menu", "ar": "عرض القائمة" }, "rowsFrom": "categories", "onEmpty": "no_menu" },
+      "next": "load_items"
+    },
+    { "id": "load_items", "type": "action", "action": "catalog.items", "params": { "categoryId": "{{category.id}}" }, "saveAs": "items", "next": "pick_item", "onError": "catalog_error" },
+    {
+      "id": "pick_item",
+      "type": "question",
+      "var": "item",
+      "prompt": { "en": "{{category.title}}: pick an item", "ar": "{{category.title}}: اختر صنفاً" },
+      "input": { "kind": "list", "button": { "en": "Items", "ar": "الأصناف" }, "rowsFrom": "items", "onEmpty": "no_items" },
+      "next": "added"
+    },
+    {
+      "id": "added",
+      "type": "message",
+      "text": {
+        "en": "Great choice: {{item.title}}. Cart and checkout are coming soon. Send \"menu\" to start again.",
+        "ar": "اختيار رائع: {{item.title}}. سلة المشتريات والدفع قريباً. أرسل \"القائمة\" للبدء من جديد."
+      },
+      "next": "done"
+    },
+    { "id": "no_menu", "type": "end", "text": { "en": "Our menu is not available right now. Please try again later.", "ar": "قائمتنا غير متاحة حالياً. يرجى المحاولة لاحقاً." } },
+    { "id": "no_items", "type": "end", "text": { "en": "That category is empty right now. Send \"menu\" to pick another.", "ar": "هذه الفئة فارغة حالياً. أرسل \"القائمة\" لاختيار فئة أخرى." } },
+    { "id": "catalog_error", "type": "end", "text": { "en": "Something went wrong loading the menu. Please try again in a moment.", "ar": "حدث خطأ أثناء تحميل القائمة. يرجى المحاولة بعد قليل." } },
+    { "id": "done", "type": "end" }
+  ]
+}

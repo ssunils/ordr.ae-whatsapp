@@ -1,0 +1,11 @@
+{
+  "id": "talk_to_us",
+  "entry": "handoff",
+  "nodes": [
+    {
+      "id": "handoff",
+      "type": "handoff",
+      "text": { "en": "One of our team will reply here shortly.", "ar": "سيرد عليك أحد أعضاء فريقنا هنا قريباً." }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "track_order",
+  "entry": "lookup",
+  "nodes": [
+    { "id": "lookup", "type": "action", "action": "orders.latest", "saveAs": "latestOrder", "next": "route", "onError": "none" },
+    { "id": "route", "type": "branch", "cases": [{ "var": "latestOrder", "exists": true, "next": "status" }], "default": "none" },
+    {
+      "id": "status",
+      "type": "end",
+      "text": { "en": "Your order {{latestOrder.number}} is {{latestOrder.status}}.", "ar": "طلبك {{latestOrder.number}} حالته {{latestOrder.status}}." }
+    },
+    { "id": "none", "type": "end", "text": { "en": "You have no recent orders. Send \"menu\" to place one.", "ar": "لا توجد لديك طلبات حديثة. أرسل \"القائمة\" لتقديم طلب." } }
+  ]
+}

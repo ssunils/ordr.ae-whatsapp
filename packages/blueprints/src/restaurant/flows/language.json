@@ -1,0 +1,22 @@
+{
+  "id": "language",
+  "entry": "ask",
+  "nodes": [
+    {
+      "id": "ask",
+      "type": "question",
+      "var": "language_choice",
+      "prompt": "Choose your language / اختر لغتك",
+      "input": {
+        "kind": "buttons",
+        "options": [
+          { "id": "en", "title": "English", "next": "set_en" },
+          { "id": "ar", "title": "العربية", "next": "set_ar" }
+        ]
+      }
+    },
+    { "id": "set_en", "type": "action", "action": "system.set_language", "params": { "language": "en" }, "next": "back" },
+    { "id": "set_ar", "type": "action", "action": "system.set_language", "params": { "language": "ar" }, "next": "back" },
+    { "id": "back", "type": "goto_flow", "flow": "main_menu" }
+  ]
+}

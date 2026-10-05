@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  blueprintId     String
+  defaultLanguage String   @default("en")
+  timezone        String   @default("Asia/Dubai")
+  settings        Json     @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  channels      Channel[]
+  customers     Customer[]
+  conversations Conversation[]
+  messages      Message[]
+}
+
+model Channel {
+  id            String   @id @default(cuid())
+  tenantId      String
+  provider      String   @default("meta_cloud")
+  phoneNumberId String   @unique
+  wabaId        String
+  displayPhone  String
+  accessToken   String
+  status        String   @default("active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  conversations Conversation[]
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  tenantId  String
+  waId      String
+  name      String?
+  language  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  conversations Conversation[]
+
+  @@unique([tenantId, waId])
+}
+
+model Conversation {
+  id            String    @id @default(cuid())
+  tenantId      String
+  channelId     String
+  customerId    String
+  /// bot: automated replies; human: an agent owns the thread; closed: archived
+  status        String    @default("bot")
+  lastInboundAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  channel  Channel   @relation(fields: [channelId], references: [id])
+  customer Customer  @relation(fields: [customerId], references: [id])
+  messages Message[]
+
+  @@index([tenantId, customerId, status])
+}
+
+model Message {
+  id                String   @id @default(cuid())
+  tenantId          String
+  conversationId    String
+  /// in or out
+  direction         String
+  providerMessageId String?  @unique
+  kind              String
+  payload           Json
+  status            String?
+  createdAt         DateTime @default(now())
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@index([conversationId, createdAt])
+}
+
+/// Session snapshot used when Redis is not configured.
+model Session {
+  tenantId  String
+  waId      String
+  state     Json
+  expiresAt DateTime
+  updatedAt DateTime @updatedAt
+
+  @@id([tenantId, waId])
+}
+
+/// Webhook dedupe used when Redis is not configured.
+model ProcessedWebhook {
+  key        String   @id
+  receivedAt DateTime @default(now())
+}
