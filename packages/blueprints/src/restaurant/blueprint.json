@@ -4,34 +4,151 @@
   "name": "Restaurant ordering",
   "description": "Menu browsing, cart and checkout for restaurants, cafes and cloud kitchens.",
   "defaultLanguage": "en",
-  "languages": ["en", "ar"],
+  "languages": [
+    "en",
+    "ar"
+  ],
   "offeringType": "product",
-  "fulfillmentTypes": ["delivery", "pickup", "dine_in"],
+  "fulfillmentTypes": [
+    "delivery",
+    "pickup",
+    "dine_in"
+  ],
   "orderStates": {
     "initial": "placed",
-    "states": ["placed", "accepted", "preparing", "ready", "out_for_delivery", "delivered", "completed", "cancelled", "rejected"],
-    "transitions": [
-      { "from": "placed", "to": "accepted", "on": "accept" },
-      { "from": "placed", "to": "rejected", "on": "reject" },
-      { "from": "placed", "to": "cancelled", "on": "cancel" },
-      { "from": "accepted", "to": "preparing", "on": "start" },
-      { "from": "accepted", "to": "cancelled", "on": "cancel" },
-      { "from": "preparing", "to": "ready", "on": "ready" },
-      { "from": "ready", "to": "out_for_delivery", "on": "dispatch" },
-      { "from": "ready", "to": "completed", "on": "complete" },
-      { "from": "out_for_delivery", "to": "delivered", "on": "deliver" },
-      { "from": "delivered", "to": "completed", "on": "complete" }
+    "states": [
+      "placed",
+      "accepted",
+      "preparing",
+      "ready",
+      "out_for_delivery",
+      "delivered",
+      "completed",
+      "cancelled",
+      "rejected"
     ],
-    "terminal": ["completed", "cancelled", "rejected"]
+    "transitions": [
+      {
+        "from": "placed",
+        "to": "accepted",
+        "on": "accept"
+      },
+      {
+        "from": "placed",
+        "to": "rejected",
+        "on": "reject"
+      },
+      {
+        "from": "placed",
+        "to": "cancelled",
+        "on": "cancel"
+      },
+      {
+        "from": "accepted",
+        "to": "preparing",
+        "on": "start"
+      },
+      {
+        "from": "accepted",
+        "to": "cancelled",
+        "on": "cancel"
+      },
+      {
+        "from": "preparing",
+        "to": "ready",
+        "on": "ready"
+      },
+      {
+        "from": "ready",
+        "to": "out_for_delivery",
+        "on": "dispatch"
+      },
+      {
+        "from": "ready",
+        "to": "completed",
+        "on": "complete"
+      },
+      {
+        "from": "out_for_delivery",
+        "to": "delivered",
+        "on": "deliver"
+      },
+      {
+        "from": "delivered",
+        "to": "completed",
+        "on": "complete"
+      }
+    ],
+    "terminal": [
+      "completed",
+      "cancelled",
+      "rejected"
+    ]
   },
   "entryFlow": "main_menu",
   "fallbackFlow": "main_menu",
   "globalCommands": [
-    { "keywords": ["menu", "hi", "hello", "start", "القائمة", "مرحبا", "السلام عليكم"], "flow": "main_menu" },
-    { "keywords": ["agent", "help", "موظف", "مساعدة"], "flow": "talk_to_us" },
-    { "keywords": ["language", "lang", "اللغة", "لغة"], "flow": "language" },
-    { "keywords": ["cancel", "stop", "إلغاء"], "flow": "main_menu" }
+    {
+      "keywords": [
+        "menu",
+        "hi",
+        "hello",
+        "start",
+        "القائمة",
+        "مرحبا",
+        "السلام عليكم"
+      ],
+      "flow": "main_menu"
+    },
+    {
+      "keywords": [
+        "cart",
+        "basket",
+        "السلة",
+        "سلة"
+      ],
+      "flow": "view_cart"
+    },
+    {
+      "keywords": [
+        "agent",
+        "help",
+        "موظف",
+        "مساعدة"
+      ],
+      "flow": "talk_to_us"
+    },
+    {
+      "keywords": [
+        "language",
+        "lang",
+        "اللغة",
+        "لغة"
+      ],
+      "flow": "language"
+    },
+    {
+      "keywords": [
+        "cancel",
+        "stop",
+        "إلغاء"
+      ],
+      "flow": "main_menu"
+    }
   ],
-  "dashboardModules": ["orders", "catalog", "customers", "inbox"],
-  "settings": { "currency": "AED", "vatRate": 0.05 }
+  "dashboardModules": [
+    "orders",
+    "catalog",
+    "customers",
+    "inbox"
+  ],
+  "settings": {
+    "currency": "AED",
+    "vatRate": 0.05,
+    "vatInclusive": true,
+    "deliveryFeeMinor": 1000,
+    "paymentMethods": [
+      "cash"
+    ]
+  }
 }

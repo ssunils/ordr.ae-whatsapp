@@ -1,3 +1,4 @@
+import type { CartModifier } from "./cart";
 import type { OfferingId, OrderId, ResourceId, TenantId } from "./ids";
 
 /**
@@ -5,30 +6,52 @@ import type { OfferingId, OrderId, ResourceId, TenantId } from "./ids";
  * resource; a food order is an Order whose constraint is kitchen capacity.
  */
 export type OrderKind = "order" | "booking" | "appointment";
+export type OrderSource = "whatsapp" | "pos" | "web";
+export type PaymentStatus = "unpaid" | "pending" | "paid" | "refunded";
 
 export interface OrderItem {
+  id?: string;
   offeringId: OfferingId;
   title: string;
   quantity: number;
-  unitPrice: number;
-  modifiers?: Array<{ id: string; title: string; price: number }>;
+  unitPriceMinor: number;
+  modifiers: CartModifier[];
+  lineTotalMinor: number;
+  notes?: string;
+}
+
+export interface DeliveryLocation {
+  latitude: number;
+  longitude: number;
+  name?: string;
+  address?: string;
   notes?: string;
 }
 
 export interface Order {
   id: OrderId;
   tenantId: TenantId;
+  /** Per-tenant human-friendly sequence, shown to customers and kitchen. */
+  number: number;
   kind: OrderKind;
-  /** Status is blueprint-defined; see StateMachine. */
+  /** Blueprint-defined; see StateMachine. */
   status: string;
   fulfillmentType: string;
-  source: "whatsapp" | "pos" | "web";
+  source: OrderSource;
   customerId: string;
+  conversationId?: string;
   items: OrderItem[];
   resourceId?: ResourceId;
   scheduledAt?: string;
   currency: string;
-  subtotal: number;
-  total: number;
-  paymentStatus: "unpaid" | "pending" | "paid" | "refunded";
+  subtotalMinor: number;
+  deliveryFeeMinor: number;
+  vatMinor: number;
+  totalMinor: number;
+  paymentStatus: PaymentStatus;
+  paymentMethod?: string;
+  deliveryLocation?: DeliveryLocation;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
 }

@@ -1,9 +1,31 @@
-# Handoff: state of the build as of 2026-10-05
+# Handoff: state of the build as of 2026-10-05 (evening)
 
 Read docs/PLAN.md first for the architecture and roadmap. This note says where the build is and
 what to do next.
 
-## What exists (commit 85ddbb2, all tests green)
+## What exists (all tests green: 42 unit, 7 integration)
+
+Phase 1 catalog and checkout landed on top of the Phase 0 foundations:
+
+- Catalog tables (Category, Offering, ModifierGroup, ModifierOption) and Order tables (Order,
+  OrderItem, OrderEvent) with two Prisma migrations committed. Money is stored in minor units.
+- Domain cart: addItem merges identical lines, quote handles delivery fee and inclusive or
+  exclusive VAT (packages/domain/src/cart.ts, money.ts, catalog.ts).
+- Restaurant flows: order_food (categories, items, modifier loop, quantity), checkout (delivery
+  with location and address note, or pickup; quote; confirm), view_cart (global command "cart"),
+  track_order. Copy in en and ar.
+- Action layer in apps/api/src/actions: catalog.*, cart.*, orders.* bound to repositories and
+  OrderService. The demo menu in demo-catalog.ts feeds both the in-memory catalog and the seed.
+- OrderService: quote, place (sequential per-tenant numbers, "order.placed" event), transition
+  (blueprint state machine, "order.status_changed" event) over an in-process EventBus port.
+- ConversationService carries the cart across "menu" and "cart" jumps and passes customer and
+  conversation ids to actions.
+- Dev Postgres is on host port 5435 (other projects hold 5432 to 5434). Prisma scripts load the
+  root .env through dotenv-cli. `pnpm --filter @ordr/api test:integration` runs the Postgres suite.
+- Verified live: compiled server on Prisma plus Redis accepted a signed webhook, replied, stored
+  the in and out messages, kept the session in Redis, and ignored the duplicate delivery.
+
+Original Phase 0 inventory follows.
 
 | Workspace | Purpose | Tests |
 |-----------|---------|-------|
@@ -23,9 +45,9 @@ pnpm db:up && pnpm db:migrate && pnpm db:seed   # Postgres + Redis via Docker, t
 pnpm dev                                    # API with tsx watch; needs .env (copy .env.example)
 ```
 
-The API runs with STORAGE=memory and WHATSAPP_SENDER=log without any infrastructure. No Prisma
-migration has been generated yet: run `pnpm db:migrate` once against Postgres to create the
-first migration folder and commit it.
+The API runs with STORAGE=memory and WHATSAPP_SENDER=log without any infrastructure. With a
+.env (copy .env.example) it uses Postgres and Redis from docker-compose; `pnpm db:seed` loads the
+demo tenant and menu.
 
 ## Design rules to keep
 
@@ -43,19 +65,21 @@ first migration folder and commit it.
 
 ## Next steps, in order
 
-1. Generate and commit the first Prisma migration. Verify the Prisma adapters against a real
-   Postgres with an integration test behind an env flag.
-2. Connect a real WhatsApp test number: fill .env from a Meta app, expose the API with a tunnel,
-   register the webhook URL (the GET handshake and signature check are done), send "hi".
-3. Phase 1 catalog service: Offering, Category, Modifier tables and a Catalog module; replace
-   demo-catalog.ts handlers with Prisma-backed ones. The blueprint should not change.
-4. Cart and checkout in the order_food flow: quantity question, add-more loop, fulfillment choice
-   (delivery, pickup), location request for delivery, order summary, Order creation using the
-   blueprint state machine, payment link action behind a PSP interface.
-5. Order status notifications: template messages when status changes, driven by domain events
-   through an outbox table and a worker app (apps/worker, BullMQ).
-6. Merchant dashboard (apps/dashboard, Next.js) with orders board and inbox; agent replies that
-   respect the human/bot conversation status already modelled.
+1. Connect a real WhatsApp test number: fill .env from a Meta app, expose the API with a tunnel,
+   register the webhook URL (the GET handshake and signature check are done), send "hi". Set
+   WHATSAPP_SENDER=meta.
+2. Order status notifications: subscribe to "order.status_changed" and message the customer.
+   Inside the 24 hour window a plain text works; outside it needs an approved template, so add a
+   template registry per tenant and a check on Conversation.lastInboundAt.
+3. Merchant order management API (accept, start, ready, complete, reject) on top of
+   OrderService.transition, with auth, then the dashboard (apps/dashboard, Next.js) orders board
+   and inbox. Agent replies must respect the human/bot conversation status already modelled.
+4. Persist the event outbox: write DomainEvents to a table in the same transaction and relay from
+   a worker (apps/worker, BullMQ) instead of the in-process InMemoryEventBus.
+5. Payment links behind a PaymentProvider port (Stripe UAE, Telr, Ziina); today paymentMethod is
+   always "cash".
+6. Multi-select modifier groups (maxSelect > 1 is stored but the flow treats groups as single
+   select), item notes, scheduled orders, delivery zones with per-zone fees.
 7. WhatsApp Flows node type (`form`) in the schema and runner, needed for the salon date picker
    in Phase 2.
 

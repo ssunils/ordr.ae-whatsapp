@@ -1,0 +1,27 @@
+{
+  "id": "view_cart",
+  "entry": "summarize",
+  "nodes": [
+    { "id": "summarize", "type": "action", "action": "cart.summary", "saveAs": "cartSummary", "next": "has_items" },
+    { "id": "has_items", "type": "branch", "cases": [{ "var": "cartSummary.count", "eq": 0, "next": "empty" }], "default": "show" },
+    { "id": "empty", "type": "end", "text": { "en": "Your cart is empty. Send \"menu\" to start an order.", "ar": "سلتك فارغة. أرسل \"القائمة\" لبدء طلب." } },
+    {
+      "id": "show",
+      "type": "question",
+      "var": "cart_choice",
+      "prompt": "{{cartSummary.text}}",
+      "input": {
+        "kind": "buttons",
+        "options": [
+          { "id": "checkout", "title": { "en": "Checkout", "ar": "إتمام الطلب" }, "next": "go_checkout" },
+          { "id": "add_more", "title": { "en": "Add more", "ar": "أضف المزيد" }, "next": "go_order" },
+          { "id": "clear", "title": { "en": "Clear cart", "ar": "إفراغ السلة" }, "next": "clear" }
+        ]
+      }
+    },
+    { "id": "go_checkout", "type": "goto_flow", "flow": "checkout" },
+    { "id": "go_order", "type": "goto_flow", "flow": "order_food" },
+    { "id": "clear", "type": "action", "action": "cart.clear", "saveAs": "cart", "next": "cleared" },
+    { "id": "cleared", "type": "end", "text": { "en": "Cart cleared. Send \"menu\" to start again.", "ar": "تم إفراغ السلة. أرسل \"القائمة\" للبدء من جديد." } }
+  ]
+}

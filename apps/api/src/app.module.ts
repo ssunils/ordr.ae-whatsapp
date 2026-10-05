@@ -2,8 +2,11 @@ import { type DynamicModule, Logger, Module, type Provider } from "@nestjs/commo
 import { getBlueprint } from "@ordr/blueprints";
 import type { ActionRegistry } from "@ordr/flow-schema";
 import { CloudApiClient, LoggingSender, type MessageSender } from "@ordr/whatsapp";
-import { createDemoActionRegistry } from "./actions/demo-catalog";
+import { demoCatalog } from "./actions/demo-catalog";
+import { createActionRegistry } from "./actions";
 import { InMemoryConversationRepository, InMemoryDedupeStore, InMemorySessionStore, InMemoryTenantRepository } from "./adapters/memory";
+import { InMemoryCatalogRepository, InMemoryEventBus, InMemoryOrderRepository } from "./adapters/memory-catalog";
+import { PrismaCatalogRepository, PrismaOrderRepository } from "./adapters/prisma-catalog";
 import {
   PrismaConversationRepository,
   PrismaDedupeStore,
@@ -16,7 +19,18 @@ import type { AppConfig } from "./config";
 import { ConversationService } from "./conversation/conversation.service";
 import { InboundQueue } from "./conversation/inbound-queue";
 import { HealthController } from "./health.controller";
-import type { BlueprintRegistry, ConversationRepository, DedupeStore, SessionStore, TenantContext, TenantRepository } from "./ports";
+import { OrderService } from "./orders/order.service";
+import type {
+  BlueprintRegistry,
+  CatalogRepository,
+  ConversationRepository,
+  DedupeStore,
+  EventBus,
+  OrderRepository,
+  SessionStore,
+  TenantContext,
+  TenantRepository,
+} from "./ports";
 import { TOKENS } from "./tokens";
 import { WebhookController } from "./webhook/webhook.controller";
 
@@ -31,6 +45,9 @@ export interface AppOptions {
     sender: MessageSender;
     actions: ActionRegistry;
     blueprints: BlueprintRegistry;
+    catalog: CatalogRepository;
+    orders: OrderRepository;
+    eventBus: EventBus;
   }>;
 }
 
@@ -65,8 +82,16 @@ export class AppModule {
     const logger = new Logger("AppModule");
     const providers: Provider[] = [
       { provide: TOKENS.Config, useValue: config },
-      { provide: TOKENS.ActionRegistry, useValue: overrides.actions ?? createDemoActionRegistry() },
       { provide: TOKENS.BlueprintRegistry, useValue: overrides.blueprints ?? { get: getBlueprint } },
+      { provide: TOKENS.EventBus, useValue: overrides.eventBus ?? new InMemoryEventBus() },
+      OrderService,
+      overrides.actions
+        ? { provide: TOKENS.ActionRegistry, useValue: overrides.actions }
+        : {
+            provide: TOKENS.ActionRegistry,
+            useFactory: (catalog: CatalogRepository, orders: OrderService) => createActionRegistry({ catalog, orders }),
+            inject: [TOKENS.CatalogRepository, OrderService],
+          },
       {
         provide: TOKENS.MessageSender,
         useValue:
@@ -78,9 +103,13 @@ export class AppModule {
     ];
 
     if (config.storage === "memory") {
-      logger.log("storage=memory: tenants, conversations, sessions and dedupe live in process");
+      logger.log("storage=memory: tenants, catalog, orders, conversations, sessions and dedupe live in process");
+      const seed = seedTenantFromConfig(config);
+      const demo = demoCatalog(seed.tenant.id);
       providers.push(
-        { provide: TOKENS.TenantRepository, useValue: overrides.tenants ?? new InMemoryTenantRepository([seedTenantFromConfig(config)]) },
+        { provide: TOKENS.CatalogRepository, useValue: overrides.catalog ?? new InMemoryCatalogRepository(demo.categories, demo.offerings) },
+        { provide: TOKENS.OrderRepository, useValue: overrides.orders ?? new InMemoryOrderRepository() },
+        { provide: TOKENS.TenantRepository, useValue: overrides.tenants ?? new InMemoryTenantRepository([seed]) },
         { provide: TOKENS.ConversationRepository, useValue: overrides.conversations ?? new InMemoryConversationRepository() },
         { provide: TOKENS.SessionStore, useValue: overrides.sessions ?? new InMemorySessionStore() },
         { provide: TOKENS.DedupeStore, useValue: overrides.dedupe ?? new InMemoryDedupeStore() },
@@ -88,6 +117,12 @@ export class AppModule {
     } else {
       providers.push(PrismaService);
       providers.push(
+        overrides.catalog
+          ? { provide: TOKENS.CatalogRepository, useValue: overrides.catalog }
+          : { provide: TOKENS.CatalogRepository, useFactory: (p: PrismaService) => new PrismaCatalogRepository(p), inject: [PrismaService] },
+        overrides.orders
+          ? { provide: TOKENS.OrderRepository, useValue: overrides.orders }
+          : { provide: TOKENS.OrderRepository, useFactory: (p: PrismaService) => new PrismaOrderRepository(p), inject: [PrismaService] },
         overrides.tenants
           ? { provide: TOKENS.TenantRepository, useValue: overrides.tenants }
           : { provide: TOKENS.TenantRepository, useFactory: (p: PrismaService) => new PrismaTenantRepository(p), inject: [PrismaService] },
@@ -119,7 +154,7 @@ export class AppModule {
       module: AppModule,
       controllers: [WebhookController, HealthController],
       providers,
-      exports: [ConversationService, InboundQueue],
+      exports: [ConversationService, InboundQueue, OrderService],
     };
   }
 }

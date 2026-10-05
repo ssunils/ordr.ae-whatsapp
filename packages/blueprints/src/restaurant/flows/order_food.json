@@ -1,6 +1,6 @@
 {
   "id": "order_food",
-  "description": "Browse categories and items. Cart and checkout arrive in Phase 1.",
+  "description": "Browse categories and items, pick modifiers and quantity, add to cart.",
   "entry": "load_categories",
   "nodes": [
     { "id": "load_categories", "type": "action", "action": "catalog.categories", "saveAs": "categories", "next": "pick_category", "onError": "catalog_error" },
@@ -19,20 +19,50 @@
       "var": "item",
       "prompt": { "en": "{{category.title}}: pick an item", "ar": "{{category.title}}: اختر صنفاً" },
       "input": { "kind": "list", "button": { "en": "Items", "ar": "الأصناف" }, "rowsFrom": "items", "onEmpty": "no_items" },
-      "next": "added"
+      "next": "start_line"
     },
+    { "id": "start_line", "type": "action", "action": "cart.start_line", "params": { "offeringId": "{{item.id}}" }, "saveAs": "line", "next": "next_group", "onError": "catalog_error" },
+    { "id": "next_group", "type": "action", "action": "cart.next_modifier_group", "saveAs": "group", "next": "has_group" },
+    { "id": "has_group", "type": "branch", "cases": [{ "var": "group", "exists": true, "next": "pick_modifier" }], "default": "ask_quantity" },
     {
-      "id": "added",
-      "type": "message",
-      "text": {
-        "en": "Great choice: {{item.title}}. Cart and checkout are coming soon. Send \"menu\" to start again.",
-        "ar": "اختيار رائع: {{item.title}}. سلة المشتريات والدفع قريباً. أرسل \"القائمة\" للبدء من جديد."
-      },
-      "next": "done"
+      "id": "pick_modifier",
+      "type": "question",
+      "var": "modifier",
+      "prompt": { "en": "{{line.title}}: {{group.title}}", "ar": "{{line.title}}: {{group.title}}" },
+      "input": { "kind": "list", "button": { "en": "Choose", "ar": "اختر" }, "rowsFrom": "group.rows", "onEmpty": "ask_quantity" },
+      "next": "apply_modifier"
     },
+    { "id": "apply_modifier", "type": "action", "action": "cart.select_modifier", "params": { "groupId": "{{group.id}}", "optionId": "{{modifier.id}}" }, "saveAs": "line", "next": "next_group" },
+    {
+      "id": "ask_quantity",
+      "type": "question",
+      "var": "quantity",
+      "prompt": { "en": "How many {{line.title}}? Reply with a number from 1 to 99.", "ar": "كم عدد {{line.title}}؟ أرسل رقماً من 1 إلى 99." },
+      "input": { "kind": "text", "pattern": "^([1-9]|[1-9][0-9])$" },
+      "invalidText": { "en": "Please send a number between 1 and 99.", "ar": "يرجى إرسال رقم بين 1 و 99." },
+      "maxRetries": 2,
+      "next": "add_to_cart"
+    },
+    { "id": "add_to_cart", "type": "action", "action": "cart.add", "params": { "quantity": "{{quantity}}" }, "saveAs": "cart", "next": "summarize" },
+    { "id": "summarize", "type": "action", "action": "cart.summary", "saveAs": "cartSummary", "next": "after_add" },
+    {
+      "id": "after_add",
+      "type": "question",
+      "var": "after_add_choice",
+      "prompt": { "en": "Added. Your cart has {{cartSummary.count}} item(s), {{cartSummary.subtotal}}.", "ar": "تمت الإضافة. سلتك تحتوي على {{cartSummary.count}} صنف، {{cartSummary.subtotal}}." },
+      "input": {
+        "kind": "buttons",
+        "options": [
+          { "id": "checkout", "title": { "en": "Checkout", "ar": "إتمام الطلب" }, "next": "go_checkout" },
+          { "id": "add_more", "title": { "en": "Add more", "ar": "أضف المزيد" }, "next": "load_categories" },
+          { "id": "view_cart", "title": { "en": "View cart", "ar": "عرض السلة" }, "next": "show_cart" }
+        ]
+      }
+    },
+    { "id": "show_cart", "type": "message", "text": "{{cartSummary.text}}", "next": "after_add" },
+    { "id": "go_checkout", "type": "goto_flow", "flow": "checkout" },
     { "id": "no_menu", "type": "end", "text": { "en": "Our menu is not available right now. Please try again later.", "ar": "قائمتنا غير متاحة حالياً. يرجى المحاولة لاحقاً." } },
     { "id": "no_items", "type": "end", "text": { "en": "That category is empty right now. Send \"menu\" to pick another.", "ar": "هذه الفئة فارغة حالياً. أرسل \"القائمة\" لاختيار فئة أخرى." } },
-    { "id": "catalog_error", "type": "end", "text": { "en": "Something went wrong loading the menu. Please try again in a moment.", "ar": "حدث خطأ أثناء تحميل القائمة. يرجى المحاولة بعد قليل." } },
-    { "id": "done", "type": "end" }
+    { "id": "catalog_error", "type": "end", "text": { "en": "Something went wrong loading the menu. Please try again in a moment.", "ar": "حدث خطأ أثناء تحميل القائمة. يرجى المحاولة بعد قليل." } }
   ]
 }

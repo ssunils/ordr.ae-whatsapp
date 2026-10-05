@@ -1,0 +1,60 @@
+{
+  "id": "checkout",
+  "description": "Fulfillment choice, delivery location, quote, confirmation and order creation.",
+  "entry": "check_cart",
+  "nodes": [
+    { "id": "check_cart", "type": "action", "action": "cart.summary", "saveAs": "cartSummary", "next": "has_items" },
+    { "id": "has_items", "type": "branch", "cases": [{ "var": "cartSummary.count", "eq": 0, "next": "empty" }], "default": "ask_fulfillment" },
+    { "id": "empty", "type": "end", "text": { "en": "Your cart is empty. Send \"menu\" to start an order.", "ar": "سلتك فارغة. أرسل \"القائمة\" لبدء طلب." } },
+    {
+      "id": "ask_fulfillment",
+      "type": "question",
+      "var": "fulfillment",
+      "prompt": { "en": "How would you like to get your order?", "ar": "كيف تود استلام طلبك؟" },
+      "input": {
+        "kind": "buttons",
+        "options": [
+          { "id": "delivery", "title": { "en": "Delivery", "ar": "توصيل" }, "next": "ask_location" },
+          { "id": "pickup", "title": { "en": "Pickup", "ar": "استلام" }, "next": "quote" }
+        ]
+      }
+    },
+    {
+      "id": "ask_location",
+      "type": "question",
+      "var": "deliveryLocation",
+      "prompt": { "en": "Please share your delivery location.", "ar": "يرجى مشاركة موقع التوصيل." },
+      "input": { "kind": "location" },
+      "invalidText": { "en": "Tap the button to share your location.", "ar": "اضغط على الزر لمشاركة موقعك." },
+      "next": "ask_address"
+    },
+    {
+      "id": "ask_address",
+      "type": "question",
+      "var": "deliveryNotes",
+      "prompt": { "en": "Building, flat number and any landmarks?", "ar": "المبنى، رقم الشقة وأي علامات مميزة؟" },
+      "input": { "kind": "text", "minLength": 2, "maxLength": 300 },
+      "next": "quote"
+    },
+    { "id": "quote", "type": "action", "action": "orders.quote", "params": { "fulfillmentType": "{{fulfillment.id}}" }, "saveAs": "quote", "next": "summary" },
+    { "id": "summary", "type": "message", "text": "{{quote.text}}", "next": "confirm" },
+    {
+      "id": "confirm",
+      "type": "question",
+      "var": "confirmation",
+      "prompt": { "en": "Shall we place this order?", "ar": "هل نقوم بتأكيد هذا الطلب؟" },
+      "input": {
+        "kind": "buttons",
+        "options": [
+          { "id": "confirm", "title": { "en": "Confirm order", "ar": "تأكيد الطلب" }, "next": "place" },
+          { "id": "cancel", "title": { "en": "Cancel", "ar": "إلغاء" }, "next": "cancelled" }
+        ]
+      }
+    },
+    { "id": "place", "type": "action", "action": "orders.create", "params": { "fulfillmentType": "{{fulfillment.id}}" }, "saveAs": "order", "next": "placed", "onError": "order_error" },
+    { "id": "placed", "type": "end", "text": "{{order.text}}" },
+    { "id": "cancelled", "type": "action", "action": "cart.clear", "saveAs": "cart", "next": "cancelled_msg" },
+    { "id": "cancelled_msg", "type": "end", "text": { "en": "No problem, the order was cancelled. Send \"menu\" whenever you are ready.", "ar": "لا مشكلة، تم إلغاء الطلب. أرسل \"القائمة\" عندما تكون جاهزاً." } },
+    { "id": "order_error", "type": "end", "text": { "en": "We could not place your order. Please try again or send \"agent\" for help.", "ar": "لم نتمكن من تسجيل طلبك. يرجى المحاولة مرة أخرى أو إرسال \"موظف\" للمساعدة." } }
+  ]
+}

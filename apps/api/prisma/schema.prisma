@@ -15,6 +15,8 @@ model Tenant {
   defaultLanguage String   @default("en")
   timezone        String   @default("Asia/Dubai")
   settings        Json     @default("{}")
+  /// Last order number issued; incremented atomically when an order is created
+  orderSeq        Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -107,4 +109,146 @@ model Session {
 model ProcessedWebhook {
   key        String   @id
   receivedAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Catalog
+// ---------------------------------------------------------------------------
+
+model Category {
+  id        String   @id @default(cuid())
+  tenantId  String
+  /// Localized name, e.g. { "en": "Burgers", "ar": "برجر" }
+  name      Json
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  offerings Offering[]
+
+  @@index([tenantId, sortOrder])
+}
+
+model Offering {
+  id              String   @id @default(cuid())
+  tenantId        String
+  categoryId      String?
+  /// product or service
+  type            String   @default("product")
+  name            Json
+  description     Json?
+  /// Minor units (fils)
+  priceMinor      Int
+  currency        String   @default("AED")
+  durationMinutes Int?
+  imageUrl        String?
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  category       Category?       @relation(fields: [categoryId], references: [id])
+  modifierGroups ModifierGroup[]
+  orderItems     OrderItem[]
+
+  @@index([tenantId, categoryId, sortOrder])
+}
+
+model ModifierGroup {
+  id         String   @id @default(cuid())
+  tenantId   String
+  offeringId String
+  name       Json
+  minSelect  Int      @default(0)
+  maxSelect  Int      @default(1)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  offering Offering         @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  options  ModifierOption[]
+
+  @@index([offeringId, sortOrder])
+}
+
+model ModifierOption {
+  id              String  @id @default(cuid())
+  tenantId        String
+  groupId         String
+  name            Json
+  priceDeltaMinor Int     @default(0)
+  sortOrder       Int     @default(0)
+  isActive        Boolean @default(true)
+
+  group ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId, sortOrder])
+}
+
+// ---------------------------------------------------------------------------
+// Orders
+// ---------------------------------------------------------------------------
+
+model Order {
+  id               String    @id @default(cuid())
+  tenantId         String
+  /// Per-tenant sequence shown to customers and kitchen
+  number           Int
+  /// order, booking or appointment
+  kind             String    @default("order")
+  status           String
+  fulfillmentType  String
+  source           String    @default("whatsapp")
+  customerId       String
+  conversationId   String?
+  currency         String    @default("AED")
+  subtotalMinor    Int
+  deliveryFeeMinor Int       @default(0)
+  vatMinor         Int       @default(0)
+  totalMinor       Int
+  paymentStatus    String    @default("unpaid")
+  paymentMethod    String?
+  deliveryLocation Json?
+  notes            String?
+  scheduledAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  items  OrderItem[]
+  events OrderEvent[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, customerId, createdAt])
+}
+
+model OrderItem {
+  id             String  @id @default(cuid())
+  orderId        String
+  offeringId     String?
+  title          String
+  quantity       Int
+  unitPriceMinor Int
+  modifiers      Json    @default("[]")
+  lineTotalMinor Int
+  notes          String?
+
+  order    Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  offering Offering? @relation(fields: [offeringId], references: [id])
+
+  @@index([orderId])
+}
+
+/// Append-only history of what happened to an order; also the seed of the event outbox.
+model OrderEvent {
+  id        String   @id @default(cuid())
+  tenantId  String
+  orderId   String
+  type      String
+  payload   Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
 }

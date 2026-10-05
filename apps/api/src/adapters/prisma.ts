@@ -1,5 +1,5 @@
 import { Injectable, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
-import type { Customer } from "@ordr/domain";
+import type { Customer, Tenant } from "@ordr/domain";
 import type { SessionState } from "@ordr/flow-schema";
 import { Prisma, PrismaClient } from "@prisma/client";
 import type {
@@ -61,6 +61,20 @@ export class PrismaTenantRepository implements TenantRepository {
         : null;
     this.cache.set(phoneNumberId, { ctx, until: Date.now() + this.cacheTtlMs });
     return ctx;
+  }
+
+  async findById(tenantId: string): Promise<Tenant | null> {
+    const t = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!t) return null;
+    return {
+      id: t.id,
+      name: t.name,
+      slug: t.slug,
+      blueprintId: t.blueprintId,
+      defaultLanguage: t.defaultLanguage,
+      timezone: t.timezone,
+      settings: (t.settings as Record<string, unknown>) ?? {},
+    };
   }
 }
 

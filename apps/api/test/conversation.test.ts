@@ -33,16 +33,99 @@ describe("ConversationService", () => {
     expect(h.conversations.messages.filter((m) => m.direction === "out")).toHaveLength(1);
   });
 
-  it("walks the ordering flow across turns", async () => {
+  it("walks a complete pickup order: modifiers, quantity, quote, confirmation", async () => {
+    await send(fixtures.textMessageWebhook("hi", h.base));
+    await send(fixtures.buttonReplyWebhook("order_food", "Order food", h.base));
+    await send(fixtures.listReplyWebhook("cat_shawarma", "Shawarma", h.base));
+    await send(fixtures.listReplyWebhook("it_chicken_shawarma", "Chicken Shawarma", h.base));
+    await send(fixtures.listReplyWebhook("sh_chk_size_large", "Large", h.base));
+    await send(fixtures.listReplyWebhook("__skip", "No thanks", h.base));
+    await send(fixtures.textMessageWebhook("2", h.base));
+    await send(fixtures.buttonReplyWebhook("checkout", "Checkout", h.base));
+    await send(fixtures.buttonReplyWebhook("pickup", "Pickup", h.base));
+    await send(fixtures.buttonReplyWebhook("confirm", "Confirm order", h.base));
+
+    const bodies = h.sender.to("971500000001").map(bodyOf);
+    expect(bodies[1]).toBe("What would you like to order?");
+    expect(bodies[2]).toBe("Shawarma: pick an item");
+    expect(bodies[3]).toBe("Chicken Shawarma: Size");
+    expect(bodies[4]).toBe("Chicken Shawarma: Extras");
+    expect(bodies[5]).toContain("How many Chicken Shawarma?");
+    expect(bodies[6]).toBe("Added. Your cart has 2 item(s), AED 46.00.");
+    expect(bodies[7]).toBe("How would you like to get your order?");
+    expect(bodies[8]).toBe("2 x Chicken Shawarma (Large)  AED 46.00\n\nSubtotal: AED 46.00\nTotal: AED 46.00\n(Includes VAT AED 2.19)");
+    expect(bodies[9]).toBe("Shall we place this order?");
+    expect(bodies[10]).toBe("Order #1 placed. Thank you! Please pay AED 46.00 when you collect your order. We will message you here as your order progresses.");
+
+    expect(h.orders.orders).toHaveLength(1);
+    const order = h.orders.orders[0]!;
+    expect(order).toMatchObject({ status: "placed", fulfillmentType: "pickup", totalMinor: 4600, paymentMethod: "cash", source: "whatsapp" });
+    expect(order.items[0]).toMatchObject({ offeringId: "it_chicken_shawarma", quantity: 2, modifiers: [{ optionId: "sh_chk_size_large", priceDeltaMinor: 500 }] });
+    expect(h.eventBus.published.map((e) => e.type)).toEqual(["order.placed"]);
+    expect(await h.sessions.get("tenant_seed", "971500000001")).toBeNull();
+  });
+
+  it("charges a delivery fee and stores the location on delivery orders", async () => {
     await send(fixtures.textMessageWebhook("hi", h.base));
     await send(fixtures.buttonReplyWebhook("order_food", "Order food", h.base));
     await send(fixtures.listReplyWebhook("cat_burgers", "Burgers", h.base));
     await send(fixtures.listReplyWebhook("it_classic_burger", "Classic Burger", h.base));
+    await send(fixtures.textMessageWebhook("1", h.base));
+    await send(fixtures.buttonReplyWebhook("checkout", "Checkout", h.base));
+    await send(fixtures.buttonReplyWebhook("delivery", "Delivery", h.base));
+    await send(fixtures.locationWebhook(25.08, 55.14, h.base));
+    await send(fixtures.textMessageWebhook("Marina Tower, flat 1203", h.base));
+    await send(fixtures.buttonReplyWebhook("confirm", "Confirm order", h.base));
+
+    const order = h.orders.orders[0]!;
+    expect(order).toMatchObject({ fulfillmentType: "delivery", subtotalMinor: 3200, deliveryFeeMinor: 1000, totalMinor: 4200 });
+    expect(order.deliveryLocation).toMatchObject({ latitude: 25.08, longitude: 55.14, notes: "Marina Tower, flat 1203" });
     const bodies = h.sender.to("971500000001").map(bodyOf);
-    expect(bodies[1]).toBe("What would you like to order?");
-    expect(bodies[2]).toBe("Burgers: pick an item");
-    expect(bodies[3]).toContain("Great choice: Classic Burger");
-    expect(await h.sessions.get("tenant_seed", "971500000001")).toBeNull();
+    expect(bodies.at(-3)).toContain("Delivery: AED 10.00");
+    expect(bodies.at(-1)).toContain("pay AED 42.00 in cash on delivery");
+  });
+
+  it("keeps the cart when the customer jumps to 'menu' or 'cart' mid-order", async () => {
+    await send(fixtures.textMessageWebhook("hi", h.base));
+    await send(fixtures.buttonReplyWebhook("order_food", "Order food", h.base));
+    await send(fixtures.listReplyWebhook("cat_sides", "Sides", h.base));
+    await send(fixtures.listReplyWebhook("it_fries", "Fries", h.base));
+    await send(fixtures.textMessageWebhook("3", h.base));
+    await send(fixtures.textMessageWebhook("menu", h.base));
+    await send(fixtures.textMessageWebhook("cart", h.base));
+    const last = bodyOf(h.sender.to("971500000001").at(-1));
+    expect(last).toBe("Your cart:\n3 x Fries  AED 36.00\n\nSubtotal: AED 36.00");
+  });
+
+  it("reports the latest order status on 'track my order'", async () => {
+    await send(fixtures.textMessageWebhook("hi", h.base));
+    await send(fixtures.buttonReplyWebhook("track_order", "Track my order", h.base));
+    expect(bodyOf(h.sender.to("971500000001").at(-1))).toContain("You have no recent orders");
+
+    await send(fixtures.textMessageWebhook("menu", h.base));
+    await send(fixtures.buttonReplyWebhook("order_food", "Order food", h.base));
+    await send(fixtures.listReplyWebhook("cat_drinks", "Drinks", h.base));
+    await send(fixtures.listReplyWebhook("it_lemon_mint", "Lemon Mint", h.base));
+    await send(fixtures.textMessageWebhook("1", h.base));
+    await send(fixtures.buttonReplyWebhook("checkout", "Checkout", h.base));
+    await send(fixtures.buttonReplyWebhook("pickup", "Pickup", h.base));
+    await send(fixtures.buttonReplyWebhook("confirm", "Confirm order", h.base));
+    await send(fixtures.textMessageWebhook("menu", h.base));
+    await send(fixtures.buttonReplyWebhook("track_order", "Track my order", h.base));
+    expect(bodyOf(h.sender.to("971500000001").at(-1))).toBe("Order #1 is received and waiting for confirmation. Total AED 15.00.");
+  });
+
+  it("cancelling at confirmation clears the cart", async () => {
+    await send(fixtures.textMessageWebhook("hi", h.base));
+    await send(fixtures.buttonReplyWebhook("order_food", "Order food", h.base));
+    await send(fixtures.listReplyWebhook("cat_sides", "Sides", h.base));
+    await send(fixtures.listReplyWebhook("it_hummus", "Hummus", h.base));
+    await send(fixtures.textMessageWebhook("1", h.base));
+    await send(fixtures.buttonReplyWebhook("checkout", "Checkout", h.base));
+    await send(fixtures.buttonReplyWebhook("pickup", "Pickup", h.base));
+    await send(fixtures.buttonReplyWebhook("cancel", "Cancel", h.base));
+    expect(bodyOf(h.sender.to("971500000001").at(-1))).toContain("the order was cancelled");
+    expect(h.orders.orders).toHaveLength(0);
   });
 
   it("drops duplicate webhook deliveries", async () => {

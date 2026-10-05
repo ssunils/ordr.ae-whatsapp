@@ -1,4 +1,4 @@
-import type { Customer } from "@ordr/domain";
+import type { Customer, Tenant } from "@ordr/domain";
 import type { SessionState } from "@ordr/flow-schema";
 import type {
   ConversationRecord,
@@ -27,6 +27,11 @@ export class InMemoryTenantRepository implements TenantRepository {
 
   async findByPhoneNumberId(phoneNumberId: string): Promise<TenantContext | null> {
     return this.byPhone.get(phoneNumberId) ?? null;
+  }
+
+  async findById(tenantId: string): Promise<Tenant | null> {
+    for (const ctx of this.byPhone.values()) if (ctx.tenant.id === tenantId) return ctx.tenant;
+    return null;
   }
 }
 

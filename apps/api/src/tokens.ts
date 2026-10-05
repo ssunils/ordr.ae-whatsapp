@@ -8,4 +8,7 @@ export const TOKENS = {
   MessageSender: Symbol("MessageSender"),
   ActionRegistry: Symbol("ActionRegistry"),
   BlueprintRegistry: Symbol("BlueprintRegistry"),
+  CatalogRepository: Symbol("CatalogRepository"),
+  OrderRepository: Symbol("OrderRepository"),
+  EventBus: Symbol("EventBus"),
 } as const;

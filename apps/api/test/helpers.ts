@@ -3,6 +3,7 @@ import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { FakeSender, fixtures } from "@ordr/whatsapp";
 import { InMemoryConversationRepository, InMemoryDedupeStore, InMemorySessionStore, InMemoryTenantRepository } from "../src/adapters/memory";
+import { InMemoryEventBus, InMemoryOrderRepository } from "../src/adapters/memory-catalog";
 import { AppModule, seedTenantFromConfig } from "../src/app.module";
 import { type AppConfig, loadConfig } from "../src/config";
 import { ConversationService } from "../src/conversation/conversation.service";
@@ -27,6 +28,8 @@ export interface Harness {
   sender: FakeSender;
   conversations: InMemoryConversationRepository;
   sessions: InMemorySessionStore;
+  orders: InMemoryOrderRepository;
+  eventBus: InMemoryEventBus;
   service: ConversationService;
   queue: InboundQueue;
   base: fixtures.FixtureBase;
@@ -38,8 +41,10 @@ export async function createHarness(): Promise<Harness> {
   const conversations = new InMemoryConversationRepository();
   const sessions = new InMemorySessionStore();
   const tenants = new InMemoryTenantRepository([seedTenantFromConfig(config)]);
+  const orders = new InMemoryOrderRepository();
+  const eventBus = new InMemoryEventBus();
   const moduleRef = await Test.createTestingModule({
-    imports: [AppModule.register({ config, overrides: { sender, conversations, sessions, tenants, dedupe: new InMemoryDedupeStore() } })],
+    imports: [AppModule.register({ config, overrides: { sender, conversations, sessions, tenants, orders, eventBus, dedupe: new InMemoryDedupeStore() } })],
   }).compile();
   const app = moduleRef.createNestApplication({ rawBody: true, logger: false });
   await app.init();
@@ -49,6 +54,8 @@ export async function createHarness(): Promise<Harness> {
     sender,
     conversations,
     sessions,
+    orders,
+    eventBus,
     service: app.get(ConversationService),
     queue: app.get(InboundQueue),
     base: { phoneNumberId: config.SEED_PHONE_NUMBER_ID, from: "971500000001", profileName: "Sara" },

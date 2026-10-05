@@ -87,13 +87,15 @@ export class ConversationService {
       tenant: { id: tenant.id, name: tenant.name },
       customer: { id: customer.id, waId: customer.waId, name: customer.name ?? "" },
     };
-    const actionCtx = { tenantId: tenant.id, customer: { waId: customer.waId, name: customer.name } };
+    const actionCtx = { tenantId: tenant.id, customer: { id: customer.id, waId: customer.waId, name: customer.name }, conversationId: conversation.id };
 
     let result: RunResult;
     try {
       if (globalFlow) {
         if (conversation.status === "human") await this.conversations.setConversationStatus(conversation.id, "bot");
-        result = await runner.start(globalFlow, { language, context: baseContext }, actionCtx);
+        // Jumping to "menu" or "cart" must not throw away what the customer has already picked.
+        const carried = session?.context.cart ? { cart: session.context.cart } : {};
+        result = await runner.start(globalFlow, { language, context: { ...baseContext, ...carried } }, actionCtx);
       } else if (session?.awaiting) {
         result = await runner.resume(session, event.content, actionCtx);
       } else {

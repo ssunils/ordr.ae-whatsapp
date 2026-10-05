@@ -16,7 +16,8 @@ export interface SessionState {
 
 export interface ActionContext {
   tenantId: string;
-  customer: { waId: string; name?: string };
+  customer: { id?: string; waId: string; name?: string };
+  conversationId?: string;
   language: string;
   context: Record<string, unknown>;
 }

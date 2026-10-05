@@ -1,5 +1,6 @@
 import "dotenv/config";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
+import { demoCatalog } from "../src/actions/demo-catalog";
 
 const prisma = new PrismaClient();
 
@@ -24,7 +25,48 @@ async function main() {
       accessToken: env.SEED_ACCESS_TOKEN ?? "replace-me",
     },
   });
-  console.log(`Seeded tenant "${tenant.name}" (${tenant.id}) with channel ${phoneNumberId}`);
+  const demo = demoCatalog(tenant.id);
+  for (const c of demo.categories) {
+    await prisma.category.upsert({
+      where: { id: c.id },
+      update: { name: c.name, sortOrder: c.sortOrder, isActive: c.isActive },
+      create: { id: c.id, tenantId: tenant.id, name: c.name, sortOrder: c.sortOrder, isActive: c.isActive },
+    });
+  }
+  for (const o of demo.offerings) {
+    await prisma.offering.upsert({
+      where: { id: o.id },
+      update: { name: o.name, description: o.description ?? Prisma.JsonNull, priceMinor: o.priceMinor, sortOrder: o.sortOrder, isActive: o.isActive, categoryId: o.categoryId },
+      create: {
+        id: o.id,
+        tenantId: tenant.id,
+        categoryId: o.categoryId,
+        type: o.type,
+        name: o.name,
+        description: o.description ?? Prisma.JsonNull,
+        priceMinor: o.priceMinor,
+        currency: o.currency,
+        sortOrder: o.sortOrder,
+        isActive: o.isActive,
+      },
+    });
+    await prisma.modifierGroup.deleteMany({ where: { offeringId: o.id } });
+    for (const g of o.modifierGroups) {
+      await prisma.modifierGroup.create({
+        data: {
+          id: g.id,
+          tenantId: tenant.id,
+          offeringId: o.id,
+          name: g.name,
+          minSelect: g.minSelect,
+          maxSelect: g.maxSelect,
+          sortOrder: g.sortOrder,
+          options: { create: g.options.map((op) => ({ id: op.id, tenantId: tenant.id, name: op.name, priceDeltaMinor: op.priceDeltaMinor, sortOrder: op.sortOrder, isActive: op.isActive })) },
+        },
+      });
+    }
+  }
+  console.log(`Seeded tenant "${tenant.name}" (${tenant.id}) with channel ${phoneNumberId}, ${demo.categories.length} categories and ${demo.offerings.length} offerings`);
 }
 
 main()
