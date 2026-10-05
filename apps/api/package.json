@@ -10,10 +10,12 @@
     "start": "node dist/main.js",
     "simulate": "tsx src/cli/simulate.ts",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:deploy": "prisma migrate deploy",
-    "prisma:seed": "tsx prisma/seed.ts",
-    "clean": "rm -rf dist"
+    "prisma:migrate": "dotenv -e ../../.env -- prisma migrate dev",
+    "prisma:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
+    "prisma:seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
+    "clean": "rm -rf dist",
+    "prisma:studio": "dotenv -e ../../.env -- prisma studio",
+    "test:integration": "dotenv -e ../../.env -- vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
@@ -39,6 +41,7 @@
     "supertest": "^7.0.0",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0",
-    "vitest": "^3.2.0"
+    "vitest": "^3.2.0",
+    "dotenv-cli": "^8.0.0"
   }
 }
